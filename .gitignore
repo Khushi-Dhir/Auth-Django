@@ -1,0 +1,51 @@
+# Python bytecode and cache
+*.pyc
+*.pyo
+__pycache__/
+
+# Virtual environment
+venv/
+.virtualenv/
+
+# Environment variables
+.env
+
+# Package manager lock files
+Pipfile.lock
+poetry.lock
+yarn.lock
+package-lock.json
+
+# Database files
+*.sqlite3
+db.sqlite3
+
+# Django-specific ignores
+secret_key.txt
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# IDE/editor settings
+.idea/
+.vscode/
+
+# Compiled files
+*.so
+*.dll
+*.dylib
+*.exe
+
+# Coverage reports
+.coverage
+htmlcov/
+*.cover
+*.py,cover
+
+# Static and media files
+staticfiles/
+media/
