@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: 'Helvetica', sans-serif; padding: 20px; line-height: 1.6; }
+        .signature { margin-top: 40px; }
+        img.signature-img { height: 60px; }
+    </style>
+</head>
+<body>
+    <h2>Offer Letter</h2>
+
+    <p>{{ body|linebreaks }}</p>
+
+    <div class="signature">
+        <p>Sincerely,</p>
+        {% if signature_image %}
+            <img class="signature-img" src="{{ signature_image }}" alt="Signature"><br>
+        {% endif %}
+        <p>{{ signature_name }}</p>
+        <p>{{ company_name }}</p>
+        <p>Date: {{ date }}</p>
+    </div>
+</body>
+</html>

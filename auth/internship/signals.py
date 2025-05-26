@@ -1,45 +1,49 @@
 # internship/signals.py
+
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from internship.models import Intern
+from users.models import CustomUser
 from django.core.mail import send_mail
 from django.conf import settings
 
-from users.models import CustomUser
-from .models import MentorApplication, MentorProfile
+import traceback
+@receiver(post_save, sender=Intern)
+def handle_intern_creation(sender, instance, created, **kwargs):
+    print(f"Signal triggered for Intern: {instance}")
+    
+    user = instance.user
+    internship = instance.internship
+    print(f"Intern created: {user.email} for internship {internship.title}")
 
+    if user.role in ['user', 'intern']:
+        generated_password = f"{user.name.lower()}123"
+        user.set_password(generated_password)
+        user.role = 'intern'
+        user.save()
+        print(f"Generated password: {generated_password}")
+        try:
+            send_mail(
+                subject='Internship Application Approved',
+                message=f"""
+Hi {user.name},
 
-@receiver(post_save, sender=MentorApplication)
-def approve_mentor_application(sender, instance, created, **kwargs):
-    """
-    Signal to create mentor profile and send approval email
-    """
-    if instance.status == 'approved':
-        user = instance.user
+🎉 Your application for the internship "{internship.title}" from "{internship.client.company_name}" has been approved!
 
-        # ✅ Create mentor profile if it doesn't exist
-        MentorProfile.objects.get_or_create(
-            user=user,
-            internship=instance.internship,
-            defaults={
-                'bio': 'No bio provided',
-                'experience': 0,
-                'expertise': 'Not specified',
-                'resume': None,
-                'status': 'approved',
-                'is_complete': False
-            }
-        )
+🔐 Your temporary password: {generated_password}
 
-        # ✅ Send approval email
-        send_mail(
-            subject='Mentor Application Approved',
-            message=(
-                f"Hello {user.name},\n\n"
-                f"Your mentor application has been approved for the internship: {instance.internship.title}.\n"
-                f"Please log in to your account to complete your profile and access mentor features.\n\n"
-                f"🚀 Xpora Team"
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
+Please log in and get started!
+
+- Team Xpora
+""",
+                from_email="xpora.website@gmail.com",
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+            print("✅ Email sent successfully from signal.")
+        except Exception as e:
+            print("❌ Email sending failed in signal:")
+            import traceback
+            traceback.print_exc()
+    else:
+        print(f"User role is already '{user.role}', skipping password/email.")

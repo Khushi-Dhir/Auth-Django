@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: "Georgia", serif; text-align: center; margin: 50px; }
+        .title { font-size: 28px; font-weight: bold; margin-bottom: 20px; }
+        .content { font-size: 18px; margin: 30px auto; max-width: 800px; }
+        .footer { margin-top: 40px; }
+    </style>
+</head>
+<body>
+    <div class="title">Certificate of Internship</div>
+    <div class="content">
+        {{ certificate_text }}
+    </div>
+    <div class="footer">
+        <p>{{ company_name }} - Xpora</p>
+        <p>Issued on: {{ date }}</p>
+    </div>
+</body>
+</html>

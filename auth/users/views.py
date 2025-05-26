@@ -5,13 +5,26 @@ from rest_framework import generics
 from django.utils.http import urlsafe_base64_encode
 from djoser.views import UserViewSet
 from rest_framework import status
-from .serializers import ProfileSerializer
+from .serializers import UserProfileSerializer , CustomUserDetailSerializer ,UserCreateSerializer
 from rest_framework.permissions import IsAuthenticated
-from .models import Profile
+from .models import UserProfile , CustomUser
 from rest_framework.decorators import api_view, renderer_classes
 from rest_framework.response import Response
 from rest_framework.renderers import JSONRenderer
+from rest_framework.decorators import action
+from rest_framework import viewsets
 
+class UserViewSet(viewsets.ModelViewSet):  
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def me(self, request):
+        user = request.user
+        return Response({
+            'id': user.id,
+            'email': user.email,
+            'name': user.name,
+            'role': user.role,
+            'is_profile_completed': user.is_profile_completed
+        })
 
 
 @api_view(['GET'])
@@ -27,75 +40,67 @@ def user_role(request):
     }, content_type='application/json')
 
 class CustomUserViewSet(UserViewSet):
+    queryset = CustomUser.objects.all()
+
+    def get_serializer_class(self):
+        if self.action in ['list', 'retrieve']:
+            return CustomUserDetailSerializer
+        return UserCreateSerializer  # or whatever your default is
+
     def activation(self, request, *args, **kwargs):
-        print("✅ Activation request received")  # Debugging
+        print("✅ Activation request received")
         return super().activation(request, *args, **kwargs)
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = CustomUserDetailSerializer(queryset, many=True)
+        print("✅ List of users:", serializer.data)  # Debugging line
+        return Response(serializer.data)
+
 
 
 class ProfileDetailView(generics.RetrieveUpdateAPIView):
-    """
-    Retrieve, Create, and Update Profile
-    """
-    serializer_class = ProfileSerializer
+    serializer_class = UserProfileSerializer
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
-        """
-        Fetch or create the profile associated with the authenticated user.
-        """
-        profile, created = Profile.objects.get_or_create(user=self.request.user)
+        profile, created = UserProfile.objects.get_or_create(user=self.request.user)
         return profile
 
     def get(self, request, *args, **kwargs):
-        """
-        Retrieve the profile
-        """
         profile = self.get_object()
-        serializer = ProfileSerializer(profile)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        serializer = self.serializer_class(profile)
+        return Response({
+            "profile": serializer.data,
+            "is_profile_completed": profile.is_complete()
+        }, status=status.HTTP_200_OK)
+
 
     def post(self, request, *args, **kwargs):
-        """
-        Create a new profile if it doesn't exist
-        """
         user = request.user
-
-        # Check if the profile already exists
-        if Profile.objects.filter(user=user).exists():
-            return Response({
-                "message": "Profile already exists. Use PUT to update."
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        serializer = ProfileSerializer(data=request.data)
-
+        if UserProfile.objects.filter(user=user).exists():
+            return Response({"message": "Profile already exists. Use PUT to update."}, status=400)
+        serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
             serializer.save(user=user)
             user.is_profile_completed = True
             user.save()
-            return Response({
-                "message": "Profile created successfully",
-                "profile": serializer.data,
-                "is_profile_completed": user.is_profile_completed
-            }, status=status.HTTP_201_CREATED)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Profile created", "profile": serializer.data}, status=201)
+        return Response(serializer.errors, status=400)
 
     def put(self, request, *args, **kwargs):
-        """
-        Update the existing profile
-        """
         profile = self.get_object()
-        serializer = ProfileSerializer(profile, data=request.data, partial=True)
-
+        serializer = self.serializer_class(
+            profile,
+            data=request.data,
+            partial=True,
+            context={"request": request}  # 👈 This adds the request to context
+        )
         if serializer.is_valid():
             serializer.save()
-            user = request.user
-            user.is_profile_completed = True
-            user.save()
-            return Response({
-                "message": "Profile updated successfully",
-                "profile": serializer.data,
-                "is_profile_completed": user.is_profile_completed
-            }, status=status.HTTP_200_OK)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            # Check if profile is now complete
+            profile.refresh_from_db()  # Ensure latest saved values are loaded
+            request.user.is_profile_completed = profile.is_complete()
+            request.user.save()
+            return Response({"message": "Profile updated", "profile": serializer.data}, status=200)
+        return Response(serializer.errors, status=400)
